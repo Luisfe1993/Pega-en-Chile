@@ -15,6 +15,7 @@ dist/
 
 # --- local data ---
 data/profile.yaml
+data/network.yaml
 data/*.sqlite
 data/*.db
 data/cache/

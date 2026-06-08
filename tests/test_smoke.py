@@ -94,3 +94,99 @@ def test_research_cache_roundtrip(tmp_path, monkeypatch):
     assert got is not None
     assert got.company == "Acme"
     assert got.what_they_do == "Stuff"
+
+
+def test_tailor_no_fabrication_drops_invented_bullets():
+    """The validator must drop bullets that don't appear on the profile."""
+    from pega_agent.models import ExperienceItem, TailoredBullet, TailoredCV
+    from pega_agent.tailor.agent import validate_no_fabrication
+
+    profile = Profile(
+        name="Test",
+        experience=[
+            ExperienceItem(
+                company="Acme",
+                title="PM",
+                start="2020",
+                bullets=["Launched new B2C product line, +$1M revenue first year."],
+            )
+        ],
+    )
+    cv = TailoredCV(
+        job_id="j1",
+        language="en",
+        headline="h",
+        summary="s",
+        bullets=[
+            TailoredBullet(
+                company="Acme",
+                original="Launched new B2C product line, +$1M revenue first year.",
+                rephrased="Spearheaded 0-to-1 B2C launch generating $1M ARR.",
+            ),
+            # Hallucinated: company exists but bullet text is invented
+            TailoredBullet(
+                company="Acme",
+                original="Closed a $50M Series B led by Sequoia.",
+                rephrased="Closed mega Series B.",
+            ),
+            # Hallucinated: company doesn't exist on profile
+            TailoredBullet(
+                company="FakeCo",
+                original="Anything.",
+                rephrased="Anything.",
+            ),
+        ],
+    )
+    cleaned = validate_no_fabrication(cv, profile)
+    assert len(cleaned.bullets) == 1
+    assert cleaned.bullets[0].company == "Acme"
+
+
+def test_network_loader_pathing(tmp_path):
+    """Direct contact must beat sector-tagged contact for path selection."""
+    from pega_agent.models import JobPosting
+    from pega_agent.network.loader import (
+        find_paths_by_sector,
+        find_paths_to_company,
+        load_network,
+    )
+
+    yaml_path = tmp_path / "network.yaml"
+    yaml_path.write_text(
+        """
+- name: "Ana"
+  company: "Falabella"
+  strength: 4
+  register: es-tu
+  tags: ["retail"]
+- name: "Beto"
+  company: "Cencosud"
+  strength: 2
+  register: es-usted
+  tags: ["retail"]
+""".strip(),
+        encoding="utf-8",
+    )
+    contacts = load_network(yaml_path)
+    JobPosting(
+        id="x", source="x", url="https://x", title="PM", company="Falabella"
+    )
+    direct = find_paths_to_company("Falabella", contacts)
+    assert direct and direct[0].name == "Ana"
+
+    sector = find_paths_by_sector("retail", contacts)
+    assert [c.name for c in sector] == ["Ana", "Beto"]
+
+
+def test_outreach_choose_referral_falls_back_to_cold_when_empty():
+    """No contacts → returns None and a default es-usted register."""
+    from pega_agent.models import JobPosting
+    from pega_agent.outreach.agent import choose_referral
+
+    job = JobPosting(
+        id="x", source="x", url="https://x", title="PM", company="Falabella"
+    )
+    contact, channel, register = choose_referral(job, [])
+    assert contact is None
+    assert channel == "linkedin_dm"
+    assert register == "es-usted"

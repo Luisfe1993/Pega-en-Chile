@@ -41,10 +41,10 @@ SQLite; the UI is a Streamlit shell during MVP.
 Reusable knowledge packs that encode Chilean-market specialization:
 
 - `chile-market-map` — sectors, top employers, headhunters, VC
+- `network-graph` — pathing rules + ES register guide for warm intros
 - `chile-cv-format` — local CV conventions (RUT, pretensiones de renta, foto)
 - `chilean-spanish-tone` — formal vs informal register, regional usage
 - `comp-bands-chile` — CLP comp bands, gratificación legal, bono variable
-- `network-graph` — warm-network referral pathing
 - `interview-pm-latam` — common case + behavioral patterns in CL/Latam
 
 ## Quickstart
@@ -77,7 +77,7 @@ streamlit run app/streamlit_app.py
 - [x] Phase 1 — Discovery agent (JobSpy + GetOnBoard adapter)
 - [x] Phase 2 — Matcher agent (keyword + multilingual semantic embeddings)
 - [x] Phase 3 — Company Research agent (DDG + NewsAPI + LLM synthesis)
-- [ ] Phase 4 — Tailor + Outreach + real LangGraph `interrupt()` Quality Gate
+- [x] Phase 4 — Tailor + Outreach + real LangGraph `interrupt()` Quality Gate
 - [ ] Phase 5 — Interview Prep + Negotiation
 - [ ] Phase 6 — Promptfoo eval harness + weekly digest
 

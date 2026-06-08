@@ -1,0 +1,42 @@
+# Example warm-network file. Copy to `data/network.yaml` and edit.
+# This file is gitignored when at `data/network.yaml` (see .gitignore).
+#
+# strength: 1=cold acquaintance · 3=friendly former colleague · 5=close friend
+# register: 'es-usted' (formal CL Spanish) | 'es-tu' (informal) | 'en'
+# tags: free-form sectors / circles for indirect-intro matching
+
+- name: "María González"
+  company: "Falabella"
+  role: "Senior Product Manager"
+  relationship: "UC Ingeniería classmate"
+  strength: 4
+  register: "es-tu"
+  linkedin_url: "https://www.linkedin.com/in/example1/"
+  tags: ["retail", "uc-ingenieria", "product"]
+  notes: "Sat next to me in Sistemas de Información. Strong PM."
+
+- name: "Diego Rivera"
+  company: "NotCo"
+  role: "Director of Data"
+  relationship: "ex-Copec colleague"
+  strength: 3
+  register: "es-tu"
+  linkedin_url: "https://www.linkedin.com/in/example2/"
+  tags: ["foodtech", "ai", "ex-copec", "data"]
+
+- name: "Catalina Pérez"
+  company: "Korn Ferry Chile"
+  role: "Consultant"
+  relationship: "MBA Chile Association"
+  strength: 3
+  register: "es-usted"
+  tags: ["headhunter", "executive-search", "mba-chile"]
+  notes: "Useful for Director-level openings across LATAM."
+
+- name: "James O'Connor"
+  company: "Microsoft"
+  role: "Principal PM"
+  relationship: "Columbia MBA classmate"
+  strength: 4
+  register: "en"
+  tags: ["msft", "columbia", "product", "ai"]

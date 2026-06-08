@@ -7,7 +7,15 @@ from sqlalchemy import JSON, DateTime, Float, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from pega_agent.config import settings
-from pega_agent.models import CompanyBrief, JobPosting, MatchScore
+from pega_agent.models import (
+    ApprovalDecision,
+    CompanyBrief,
+    CoverLetter,
+    JobPosting,
+    MatchScore,
+    OutreachDraft,
+    TailoredCV,
+)
 
 
 class Base(DeclarativeBase):
@@ -40,6 +48,37 @@ class CompanyBriefRow(Base):
     company: Mapped[str] = mapped_column(String, primary_key=True)
     payload: Mapped[dict] = mapped_column(JSON)
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TailoredCVRow(Base):
+    __tablename__ = "tailored_cvs"
+    job_id: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CoverLetterRow(Base):
+    __tablename__ = "cover_letters"
+    job_id: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class OutreachRow(Base):
+    __tablename__ = "outreach"
+    job_id: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ApprovalRow(Base):
+    __tablename__ = "approvals"
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # f"{job_id}|{artifact}"
+    job_id: Mapped[str] = mapped_column(String, index=True)
+    artifact: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, index=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    decided_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 def get_engine():
@@ -140,3 +179,96 @@ def load_briefs(limit: int = 50) -> list[CompanyBrief]:
             .all()
         )
         return [CompanyBrief(**r.payload) for r in rows]
+
+
+# ---------- Tailor / CoverLetter / Outreach / Approval -------------------
+
+
+def save_tailored_cv(cv: TailoredCV) -> None:
+    engine = get_engine()
+    with Session(engine) as s:
+        s.merge(
+            TailoredCVRow(
+                job_id=cv.job_id,
+                payload=json.loads(cv.model_dump_json()),
+                generated_at=cv.generated_at,
+            )
+        )
+        s.commit()
+
+
+def load_tailored_cv(job_id: str) -> TailoredCV | None:
+    engine = get_engine()
+    with Session(engine) as s:
+        row = s.get(TailoredCVRow, job_id)
+        return TailoredCV(**row.payload) if row else None
+
+
+def save_cover_letter(cl: CoverLetter) -> None:
+    engine = get_engine()
+    with Session(engine) as s:
+        s.merge(
+            CoverLetterRow(
+                job_id=cl.job_id,
+                payload=json.loads(cl.model_dump_json()),
+                generated_at=cl.generated_at,
+            )
+        )
+        s.commit()
+
+
+def load_cover_letter(job_id: str) -> CoverLetter | None:
+    engine = get_engine()
+    with Session(engine) as s:
+        row = s.get(CoverLetterRow, job_id)
+        return CoverLetter(**row.payload) if row else None
+
+
+def save_outreach(draft: OutreachDraft) -> None:
+    engine = get_engine()
+    with Session(engine) as s:
+        s.merge(
+            OutreachRow(
+                job_id=draft.job_id,
+                payload=json.loads(draft.model_dump_json()),
+                generated_at=draft.generated_at,
+            )
+        )
+        s.commit()
+
+
+def load_outreach(job_id: str) -> OutreachDraft | None:
+    engine = get_engine()
+    with Session(engine) as s:
+        row = s.get(OutreachRow, job_id)
+        return OutreachDraft(**row.payload) if row else None
+
+
+def save_approval(decision: ApprovalDecision) -> None:
+    engine = get_engine()
+    with Session(engine) as s:
+        s.merge(
+            ApprovalRow(
+                id=f"{decision.job_id}|{decision.artifact}",
+                job_id=decision.job_id,
+                artifact=decision.artifact,
+                status=decision.status,
+                payload=json.loads(decision.model_dump_json()),
+                decided_at=decision.decided_at,
+            )
+        )
+        s.commit()
+
+
+def load_approvals(
+    job_id: str | None = None, status: str | None = None, limit: int = 200
+) -> list[ApprovalDecision]:
+    engine = get_engine()
+    with Session(engine) as s:
+        q = s.query(ApprovalRow)
+        if job_id:
+            q = q.filter(ApprovalRow.job_id == job_id)
+        if status:
+            q = q.filter(ApprovalRow.status == status)
+        rows = q.order_by(ApprovalRow.decided_at.desc()).limit(limit).all()
+        return [ApprovalDecision(**r.payload) for r in rows]
