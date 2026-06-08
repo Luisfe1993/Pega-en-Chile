@@ -1,0 +1,99 @@
+{
+  "folders": [
+    {
+      "name": "Pega-en-Chile",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": ["tests"],
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+      "source.fixAll": "explicit"
+    },
+    "[python]": {
+      "editor.defaultFormatter": "charliermarsh.ruff",
+      "editor.tabSize": 4
+    },
+    "[yaml]": {
+      "editor.tabSize": 2
+    },
+    "[markdown]": {
+      "editor.wordWrap": "on"
+    },
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/.pytest_cache": true,
+      "**/.ruff_cache": true,
+      "**/.mypy_cache": true,
+      "**/*.egg-info": true
+    },
+    "files.watcherExclude": {
+      "**/.venv/**": true,
+      "**/data/*.sqlite": true,
+      "**/data/cache/**": true
+    },
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "search.exclude": {
+      "**/.venv": true,
+      "**/data/*.sqlite": true,
+      "**/__pycache__": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "charliermarsh.ruff",
+      "tamasfe.even-better-toml",
+      "redhat.vscode-yaml",
+      "github.copilot",
+      "github.copilot-chat"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Streamlit · Pega-en-Chile",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "streamlit",
+        "args": ["run", "${workspaceFolder}/app/streamlit_app.py"],
+        "console": "integratedTerminal",
+        "justMyCode": false
+      },
+      {
+        "name": "CLI · pega run (default)",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "pega_agent.cli",
+        "args": ["run", "--tailor", "3", "--research", "5"],
+        "console": "integratedTerminal",
+        "justMyCode": false
+      },
+      {
+        "name": "CLI · pega top",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "pega_agent.cli",
+        "args": ["top"],
+        "console": "integratedTerminal"
+      },
+      {
+        "name": "Tests · pytest",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "pytest",
+        "args": ["-q"],
+        "console": "integratedTerminal"
+      }
+    ]
+  }
+}
