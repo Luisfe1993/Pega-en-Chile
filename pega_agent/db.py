@@ -7,7 +7,7 @@ from sqlalchemy import JSON, DateTime, Float, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from pega_agent.config import settings
-from pega_agent.models import JobPosting, MatchScore
+from pega_agent.models import CompanyBrief, JobPosting, MatchScore
 
 
 class Base(DeclarativeBase):
@@ -33,6 +33,13 @@ class MatchRow(Base):
     score: Mapped[float] = mapped_column(Float, index=True)
     payload: Mapped[dict] = mapped_column(JSON)
     scored_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CompanyBriefRow(Base):
+    __tablename__ = "company_briefs"
+    company: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 def get_engine():
@@ -101,3 +108,35 @@ def load_matches(limit: int = 50) -> list[MatchScore]:
             s.query(MatchRow).order_by(MatchRow.score.desc()).limit(limit).all()
         )
         return [MatchScore(**r.payload) for r in rows]
+
+
+def save_brief(brief: CompanyBrief) -> None:
+    engine = get_engine()
+    with Session(engine) as s:
+        s.merge(
+            CompanyBriefRow(
+                company=brief.company.lower(),
+                payload=json.loads(brief.model_dump_json()),
+                generated_at=brief.generated_at,
+            )
+        )
+        s.commit()
+
+
+def load_brief(company: str) -> CompanyBrief | None:
+    engine = get_engine()
+    with Session(engine) as s:
+        row = s.get(CompanyBriefRow, company.lower())
+        return CompanyBrief(**row.payload) if row else None
+
+
+def load_briefs(limit: int = 50) -> list[CompanyBrief]:
+    engine = get_engine()
+    with Session(engine) as s:
+        rows = (
+            s.query(CompanyBriefRow)
+            .order_by(CompanyBriefRow.generated_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [CompanyBrief(**r.payload) for r in rows]

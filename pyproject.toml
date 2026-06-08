@@ -39,6 +39,8 @@ dependencies = [
     "sentence-transformers>=3.0",
     "streamlit>=1.36",
     "pandas>=2.2",
+    "numpy>=1.26",
+    "duckduckgo-search>=6.2",
 ]
 
 [project.optional-dependencies]

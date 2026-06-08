@@ -74,10 +74,10 @@ streamlit run app/streamlit_app.py
 ## Roadmap
 
 - [x] Phase 0 — scaffolding, profile schema, SQLite, Streamlit shell
-- [ ] Phase 1 — Discovery agent (JobSpy + GetOnBoard adapter)
-- [ ] Phase 2 — Matcher agent (embeddings + scoring)
-- [ ] Phase 3 — Company Research + Tailor
-- [ ] Phase 4 — Outreach + Quality Gate
+- [x] Phase 1 — Discovery agent (JobSpy + GetOnBoard adapter)
+- [x] Phase 2 — Matcher agent (keyword + multilingual semantic embeddings)
+- [x] Phase 3 — Company Research agent (DDG + NewsAPI + LLM synthesis)
+- [ ] Phase 4 — Tailor + Outreach + real LangGraph `interrupt()` Quality Gate
 - [ ] Phase 5 — Interview Prep + Negotiation
 - [ ] Phase 6 — Promptfoo eval harness + weekly digest
 

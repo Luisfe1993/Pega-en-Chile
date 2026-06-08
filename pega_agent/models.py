@@ -75,4 +75,21 @@ class MatchScore(BaseModel):
     seniority_fit: float = 0.0
     sector_fit: float = 0.0
     location_fit: float = 0.0
+    semantic_fit: float = 0.0
     comp_fit: float | None = None
+
+
+class CompanyBrief(BaseModel):
+    """Concise enrichment for a target company, produced by the Research agent."""
+
+    company: str
+    what_they_do: str
+    sector: str | None = None
+    size: str | None = None  # 'startup' | 'scale-up' | 'enterprise' | etc.
+    headquarters: str | None = None
+    recent_news: list[str] = Field(default_factory=list)
+    why_role_exists: str | None = None
+    red_flags: list[str] = Field(default_factory=list)
+    talking_points: list[str] = Field(default_factory=list)
+    sources: list[str] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=datetime.utcnow)

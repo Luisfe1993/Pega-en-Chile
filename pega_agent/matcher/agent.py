@@ -1,12 +1,14 @@
 """Matcher Agent: scores each job 0..100 against the candidate profile.
 
-MVP scoring blends:
-  - keyword overlap (skills ∩ description)         40%
-  - seniority fit (title match heuristics)         20%
-  - sector fit (target sectors ∩ company sector)   20%
-  - location fit (target locations vs job location)20%
+Scoring blends (when embeddings are available):
+  - semantic fit (cosine of profile-blob vs JD)    35%
+  - keyword overlap (skills ∩ description)         15%
+  - seniority fit (title heuristics)               20%
+  - sector fit (target sectors ∩ company sector)   15%
+  - location fit (target locations vs job location)15%
 
-Phase-2 swap: replace keyword overlap with embedding cosine via Chroma.
+If sentence-transformers / the embedding model can't load, the semantic
+channel returns 0 and the other channels are renormalized to 100%.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from __future__ import annotations
 import re
 
 from pega_agent.db import save_matches
+from pega_agent.matcher import embeddings
 from pega_agent.models import JobPosting, MatchScore, Profile
 
 SENIORITY_HINTS = {
@@ -83,9 +86,23 @@ def score_job(profile: Profile, job: JobPosting) -> MatchScore:
     sen = _seniority_fit(profile, job)
     sec = _sector_fit(profile, job)
     loc = _location_fit(profile, job)
-    raw = 100 * (0.40 * skill + 0.20 * sen + 0.20 * sec + 0.20 * loc)
+    sem = _semantic_fit(profile, job)
+
+    if embeddings.is_available():
+        weights = {"sem": 0.35, "skill": 0.15, "sen": 0.20, "sec": 0.15, "loc": 0.15}
+    else:
+        weights = {"sem": 0.00, "skill": 0.40, "sen": 0.20, "sec": 0.20, "loc": 0.20}
+
+    raw = 100 * (
+        weights["sem"] * sem
+        + weights["skill"] * skill
+        + weights["sen"] * sen
+        + weights["sec"] * sec
+        + weights["loc"] * loc
+    )
     rationale = (
-        f"skills {skill:.2f} · seniority {sen:.2f} · sector {sec:.2f} · location {loc:.2f}"
+        f"sem {sem:.2f} · skills {skill:.2f} · seniority {sen:.2f} · "
+        f"sector {sec:.2f} · location {loc:.2f}"
     )
     return MatchScore(
         job_id=job.id,
@@ -95,7 +112,33 @@ def score_job(profile: Profile, job: JobPosting) -> MatchScore:
         seniority_fit=sen,
         sector_fit=sec,
         location_fit=loc,
+        semantic_fit=sem,
     )
+
+
+def _profile_blob(profile: Profile) -> str:
+    parts = [
+        profile.headline or "",
+        profile.summary or "",
+        " ".join(profile.skills),
+        " ".join(profile.target_roles),
+        " ".join(profile.target_sectors),
+    ]
+    for exp in profile.experience[:6]:
+        parts.append(f"{exp.title} @ {exp.company}: {' · '.join(exp.bullets[:3])}")
+    return "\n".join(p for p in parts if p)
+
+
+def _semantic_fit(profile: Profile, job: JobPosting) -> float:
+    if not embeddings.is_available():
+        return 0.0
+    profile_text = _profile_blob(profile)
+    job_text = f"{job.title}\n{job.description[:2000]}"
+    vecs = embeddings.embed_texts([profile_text, job_text])
+    if vecs.shape[0] < 2:
+        return 0.0
+    # cosine of unit-normalized vectors is in [-1, 1]; clamp to [0, 1]
+    return max(0.0, min(1.0, float(embeddings.cosine(vecs[0], vecs[1]))))
 
 
 def rank(profile: Profile, jobs: list[JobPosting]) -> list[MatchScore]:
