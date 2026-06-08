@@ -1,0 +1,37 @@
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+venv/
+build/
+dist/
+
+# --- env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- local data ---
+data/profile.yaml
+data/*.sqlite
+data/*.db
+data/cache/
+*.log
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# --- streamlit ---
+.streamlit/secrets.toml
+
+# --- tests / tooling ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage

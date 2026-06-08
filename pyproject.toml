@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pega-agent"
+version = "0.1.0"
+description = "Agentic job-search toolkit tuned for the Chilean market."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Luis Felipe Sande" }]
+requires-python = ">=3.11"
+keywords = ["langgraph", "agents", "job-search", "chile", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "langgraph>=0.2.50",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-anthropic>=0.2.0",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "pypdf>=4.3",
+    "sqlalchemy>=2.0",
+    "rich>=13.7",
+    "typer>=0.12",
+    "httpx>=0.27",
+    "python-jobspy>=1.1.70",
+    "chromadb>=0.5",
+    "sentence-transformers>=3.0",
+    "streamlit>=1.36",
+    "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "promptfoo>=0.1; sys_platform == 'never'",
+]
+
+[project.scripts]
+pega = "pega_agent.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/Luisfe1993/Pega-en-Chile"
+Issues = "https://github.com/Luisfe1993/Pega-en-Chile/issues"
+
+[tool.setuptools.packages.find]
+include = ["pega_agent*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"

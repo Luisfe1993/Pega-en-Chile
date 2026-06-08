@@ -1,0 +1,50 @@
+# Example profile. Copy to `data/profile.yaml` and edit.
+# Anything in this file is treated as ground truth by the Matcher and Tailor
+# agents. Be honest — the Tailor agent will refuse to fabricate experience.
+
+name: "Your Name"
+headline: "Senior Product Manager · AI · Energy"
+locations_open_to:
+  - "Santiago, CL"
+  - "Remote, CL"
+work_authorization:
+  - "Chilean citizen"
+  - "EU citizen"
+languages:
+  - "es"
+  - "en"
+
+target_roles:
+  - "product manager"
+  - "senior product manager"
+  - "gerente de producto"
+  - "head of product"
+target_seniority: "manager"
+target_sectors:
+  - "energy"
+  - "fintech"
+  - "retail"
+  - "ai"
+  - "saas"
+target_min_comp_clp: 6000000  # gross monthly CLP
+
+skills:
+  - "product management"
+  - "agile"
+  - "okrs"
+  - "ai"
+  - "llm"
+  - "langgraph"
+  - "power bi"
+  - "sql"
+  - "stakeholder management"
+  - "go-to-market"
+  - "b2c"
+  - "energy"
+
+experience: []
+education: []
+
+summary: |
+  Bilingual product manager with 7+ years across energy, retail and AI
+  productivity tooling. Strong in 0→1 B2C launches and agentic systems.
