@@ -70,6 +70,20 @@ def detect_jd_language(job: JobPosting) -> Language:
     return "en"
 
 
+def detect_text_language(text: str) -> Language:
+    """Same heuristic but for an arbitrary blob (used for profile language)."""
+    t = (text or "").lower()
+    es_markers = (" del ", " los ", " las ", " que ", " con ", " para ", "experiencia", "años")
+    if sum(m in t for m in es_markers) >= 2:
+        return "es"
+    return "en"
+
+
+def _profile_language(profile: Profile) -> Language:
+    blob = " ".join([profile.headline or "", profile.summary or ""])
+    return detect_text_language(blob)
+
+
 # ---------- LLM contracts ------------------------------------------------
 
 
@@ -94,9 +108,10 @@ _TAILOR_PROMPT = ChatPromptTemplate.from_messages(
                 "    achievements that are not in the provided bullet pool.\n"
                 "  - Every output bullet must reference an `original` value that exists\n"
                 "    verbatim (or near-verbatim) in the bullet pool, and the same `company`.\n"
-                "  - `language` must match the dominant language of the job description.\n"
-                "  - `headline` and `summary` are rephrased from the candidate's own\n"
-                "    headline/summary; do not introduce new credentials.\n"
+                "  - Write `headline`, `summary`, and every bullet's `rephrased` value\n"
+                "    in {cv_language}. This MUST match the candidate's resume language,\n"
+                "    not the job description.\n"
+                "  - Set `language` = {cv_language}.\n"
                 "  - `skills_top`: pick 6-10 skills from the candidate's skills list that\n"
                 "    appear (literally or as close synonyms) in the JD. Do not add new ones.\n"
                 "  - Set `emphasis` 1-5 per bullet for ordering."
@@ -132,6 +147,7 @@ def tailor_cv(
     model = get_chat_model(temperature=0.2)
     chain = _TAILOR_PROMPT | model.with_structured_output(_TailorDraft)
     pool = [{"company": c, "bullet": b} for c, b in _all_bullets(profile)]
+    cv_language: Language = _profile_language(profile)
     draft: _TailorDraft = chain.invoke(
         {
             "name": profile.name,
@@ -143,11 +159,12 @@ def tailor_cv(
             "job_company": job.company,
             "job_description": (job.description or "")[:4000],
             "brief": brief.what_they_do if brief else "(none)",
+            "cv_language": cv_language,
         }
     )
     cv = TailoredCV(
         job_id=job.id,
-        language=draft.language,
+        language=cv_language,
         headline=draft.headline,
         summary=draft.summary,
         bullets=draft.bullets,

@@ -15,10 +15,20 @@ dist/
 
 # --- local data ---
 data/profile.yaml
+data/profile.yaml.bak
 data/network.yaml
+data/recruiters.yaml
+data/search.yaml
+data/resume-template.docx
 data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+data/*.sqlite-journal
 data/*.db
 data/cache/
+data/linkedin_export/
+data/exports/
+data/digests/
 *.log
 
 # --- IDE ---

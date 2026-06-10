@@ -19,12 +19,21 @@ from langgraph.types import Command  # noqa: E402
 
 from pega_agent.config import ROOT as PKG_ROOT  # noqa: E402
 from pega_agent.db import (  # noqa: E402
+    load_all_negotiations,
+    load_all_prep,
     load_approvals,
+    load_brief,
     load_briefs,
+    load_cover_letter,
+    load_interview_prep,
+    load_job,
     load_jobs,
     load_matches,
+    load_negotiation,
+    load_tailored_cv,
 )
 from pega_agent.graph import build_graph  # noqa: E402
+from pega_agent.llm import has_llm  # noqa: E402
 from pega_agent.profile.agent import load_profile  # noqa: E402
 from pega_agent.research.agent import research_company  # noqa: E402
 
@@ -95,8 +104,16 @@ with st.sidebar:
 
 # ---------- tabs ---------------------------------------------------------
 
-tab_queue, tab_matches, tab_jobs, tab_briefs, tab_approvals = st.tabs(
-    ["⏸ Approval Queue", "Top matches", "All jobs", "Company briefs", "Approvals log"]
+tab_queue, tab_matches, tab_jobs, tab_briefs, tab_approvals, tab_prep, tab_neg = st.tabs(
+    [
+        "⏸ Approval Queue",
+        "Top matches",
+        "All jobs",
+        "Company briefs",
+        "Approvals log",
+        "🎯 Interview Prep",
+        "💰 Negotiation",
+    ]
 )
 
 # ---------- Approval Queue tab ------------------------------------------
@@ -268,3 +285,152 @@ with tab_approvals:
     else:
         df = pd.DataFrame([r.model_dump() for r in rows])
         st.dataframe(df, use_container_width=True, hide_index=True)
+
+
+# ---------- Interview Prep tab ------------------------------------------
+
+
+def _approved_job_options() -> list[tuple[str, str]]:
+    """Return (job_id, label) for jobs that have at least one approved artifact."""
+    approved = [a for a in load_approvals(status="approved")]
+    seen: dict[str, str] = {}
+    for a in approved:
+        if a.job_id in seen:
+            continue
+        j = load_job(a.job_id)
+        seen[a.job_id] = f"{j.company} · {j.title}" if j else a.job_id
+    return list(seen.items())
+
+
+with tab_prep:
+    st.subheader("Interview prep packs")
+    options = _approved_job_options()
+    if not options:
+        st.info("Approve at least one job first (Approval Queue tab).")
+    else:
+        labels = {jid: f"{lbl}  ({jid[:8]})" for jid, lbl in options}
+        sel = st.selectbox(
+            "Approved job", list(labels.keys()), format_func=lambda k: labels[k], key="prep_sel"
+        )
+        col_a, col_b = st.columns([1, 3])
+        with col_a:
+            disabled = not has_llm()
+            if st.button("Generate prep pack", type="primary", disabled=disabled):
+                from pega_agent.interview.agent import generate_prep_pack
+
+                profile = load_profile(profile_path)
+                job = load_job(sel)
+                brief = load_brief(job.company) if job else None
+                cv = load_tailored_cv(sel)
+                with st.spinner("Generating prep pack…"):
+                    generate_prep_pack(profile, job, brief=brief, cv=cv)
+                st.success("Prep pack ready.")
+            if disabled:
+                st.caption("Needs OPENAI_API_KEY or ANTHROPIC_API_KEY.")
+        pack = load_interview_prep(sel)
+        if not pack:
+            st.info("No prep pack saved for this job yet.")
+        else:
+            st.markdown(f"**Company angle**\n\n{pack.company_angle}")
+            st.markdown(f"### STAR stories ({len(pack.star_stories)})")
+            for s in pack.star_stories:
+                with st.expander(f"[{s.theme}] {s.title} — source: {s.source_company}"):
+                    st.markdown(f"**Situation:** {s.situation}")
+                    st.markdown(f"**Task:** {s.task}")
+                    st.markdown(f"**Action:** {s.action}")
+                    st.markdown(f"**Result:** {s.result}")
+                    st.caption(f"Source bullet: {s.source_bullet}")
+            st.markdown("### Case warmups")
+            for c in pack.case_warmups:
+                with st.expander(c.prompt[:120] + ("…" if len(c.prompt) > 120 else "")):
+                    st.markdown(f"**Framework:** {c.suggested_framework}")
+                    if c.key_dimensions:
+                        st.markdown("**Key dimensions**")
+                        for d in c.key_dimensions:
+                            st.markdown(f"- {d}")
+                    if c.likely_followups:
+                        st.markdown("**Likely follow-ups**")
+                        for f in c.likely_followups:
+                            st.markdown(f"- {f}")
+            st.markdown("### Questions to ask them")
+            for q in pack.questions_to_ask:
+                st.markdown(f"- {q}")
+            st.markdown("### Likely questions to expect")
+            for q in pack.likely_questions:
+                st.markdown(f"- {q}")
+        with st.expander("All saved prep packs", expanded=False):
+            for p in load_all_prep(limit=20):
+                j = load_job(p.job_id)
+                st.markdown(
+                    f"- **{j.company if j else '?'} · {j.title if j else p.job_id}** — "
+                    f"{len(p.star_stories)} STARs · {len(p.case_warmups)} cases · "
+                    f"{p.generated_at.isoformat(timespec='seconds')}"
+                )
+
+
+# ---------- Negotiation tab ---------------------------------------------
+
+with tab_neg:
+    st.subheader("Counter-offer drafts")
+    options = _approved_job_options()
+    if not options:
+        st.info("Approve at least one job first (Approval Queue tab).")
+    else:
+        labels = {jid: f"{lbl}  ({jid[:8]})" for jid, lbl in options}
+        sel = st.selectbox(
+            "Approved job", list(labels.keys()), format_func=lambda k: labels[k], key="neg_sel"
+        )
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            offer = st.number_input("Offer base (CLP gross/mo)", min_value=0, step=100_000, value=6_000_000)
+        with c2:
+            variable_pct = st.number_input("Variable target (% of base)", min_value=0.0, step=1.0, value=15.0)
+        with c3:
+            competing = st.number_input("Competing offer (CLP, 0 = none)", min_value=0, step=100_000, value=0)
+        if st.button("Generate counter-offer", type="primary", disabled=not has_llm()):
+            from pega_agent.negotiation.agent import negotiate
+
+            profile = load_profile(profile_path)
+            job = load_job(sel)
+            brief = load_brief(job.company) if job else None
+            with st.spinner("Drafting negotiation…"):
+                negotiate(
+                    profile,
+                    job,
+                    offer_base_clp=int(offer),
+                    offer_variable_pct=float(variable_pct) if variable_pct else None,
+                    competing_offer_clp=int(competing) if competing else None,
+                    brief=brief,
+                )
+            st.success("Negotiation draft ready.")
+        if not has_llm():
+            st.caption("Needs OPENAI_API_KEY or ANTHROPIC_API_KEY.")
+        neg = load_negotiation(sel)
+        if not neg:
+            st.info("No negotiation draft saved for this job yet.")
+        else:
+            b = neg.benchmark
+            if b:
+                cA, cB, cC = st.columns(3)
+                cA.metric("Low (CLP/mo)", f"{b.base_low_clp:,}")
+                cB.metric("Mid (CLP/mo)", f"{b.base_mid_clp:,}")
+                cC.metric("High (CLP/mo)", f"{b.base_high_clp:,}")
+                st.caption(f"{b.role} · {b.seniority} · {b.sector or '—'} · variable ~{b.variable_pct:.0f}%")
+            cT, cW = st.columns(2)
+            cT.metric("Target ask (CLP/mo)", f"{neg.target_base_clp:,}")
+            cW.metric("Walk-away floor", f"{neg.walk_away_clp:,}")
+            st.markdown(f"**Rationale**\n\n{neg.rationale}")
+            st.markdown("**Levers beyond base**")
+            for lv in neg.levers_to_negotiate:
+                st.markdown(f"- {lv}")
+            if neg.counter_email_subject:
+                st.markdown(f"**Subject:** {neg.counter_email_subject}")
+            st.text_area("Counter-offer email", value=neg.counter_email_body, height=300)
+        with st.expander("All saved negotiations", expanded=False):
+            for n in load_all_negotiations(limit=20):
+                j = load_job(n.job_id)
+                st.markdown(
+                    f"- **{j.company if j else '?'} · {j.title if j else n.job_id}** — "
+                    f"offer {n.offer_base_clp:,} → ask {n.target_base_clp:,} CLP/mo · "
+                    f"{n.generated_at.isoformat(timespec='seconds')}"
+                )

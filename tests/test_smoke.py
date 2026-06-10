@@ -53,8 +53,8 @@ def test_score_job_irrelevant():
 
 def test_embeddings_degraded_mode(monkeypatch):
     """When the model can't load, semantic_fit must be 0 and the score still in range."""
-    monkeypatch.setattr(embeddings, "_get_model", lambda: None)
     embeddings._get_model.cache_clear()  # type: ignore[attr-defined]
+    monkeypatch.setattr(embeddings, "_get_model", lambda: None)
     profile = Profile(
         name="Test",
         target_seniority="manager",
@@ -190,3 +190,117 @@ def test_outreach_choose_referral_falls_back_to_cold_when_empty():
     assert contact is None
     assert channel == "linkedin_dm"
     assert register == "es-usted"
+
+
+# ---------- Phase 5 ------------------------------------------------------
+
+
+def test_interview_prep_validator_drops_invented_stars():
+    """STAR stories whose source bullet doesn't match the profile are dropped."""
+    from pega_agent.interview.agent import validate_stars
+    from pega_agent.models import ExperienceItem, STARStory
+
+    profile = Profile(
+        name="Test",
+        experience=[
+            ExperienceItem(
+                company="Acme",
+                title="PM",
+                start="2020",
+                bullets=["Launched new B2C product line, +$1M revenue first year."],
+            )
+        ],
+    )
+    real = STARStory(
+        theme="0-to-1",
+        title="B2C launch",
+        situation="Acme had no B2C SKU.",
+        task="Build and ship the first.",
+        action="Stood up the team, picked the segment, ran 4 experiments.",
+        result="$1M ARR year 1.",
+        source_company="Acme",
+        source_bullet="Launched new B2C product line, +$1M revenue first year.",
+    )
+    invented = STARStory(
+        theme="leadership",
+        title="Series B",
+        situation="x",
+        task="x",
+        action="x",
+        result="x",
+        source_company="Acme",
+        source_bullet="Closed a $50M Series B led by Sequoia.",  # not in profile
+    )
+    out = validate_stars([real, invented], profile)
+    assert len(out) == 1
+    assert out[0].title == "B2C launch"
+
+
+def test_negotiation_draft_roundtrip():
+    """NegotiationDraft must serialize / deserialize cleanly."""
+    from pega_agent.models import CompBenchmark, NegotiationDraft
+
+    bench = CompBenchmark(
+        role="Director of Product",
+        seniority="director",
+        sector="retail",
+        base_low_clp=8_000_000,
+        base_mid_clp=10_500_000,
+        base_high_clp=13_000_000,
+        variable_pct=20.0,
+    )
+    neg = NegotiationDraft(
+        job_id="abc",
+        offer_base_clp=9_500_000,
+        target_base_clp=11_000_000,
+        walk_away_clp=10_000_000,
+        benchmark=bench,
+        levers_to_negotiate=["bono garantizado año 1", "sign-on 8M", "20 días vacaciones"],
+        rationale="Offer below mid; modest counter justified.",
+        counter_email_body="Estimado/a, gracias por la oferta…",
+    )
+    blob = neg.model_dump_json()
+    again = NegotiationDraft.model_validate_json(blob)
+    assert again.target_base_clp == 11_000_000
+    assert again.benchmark and again.benchmark.base_mid_clp == 10_500_000
+    assert again.language == "es"
+
+
+def test_interview_prep_db_roundtrip(tmp_path, monkeypatch):
+    """save_interview_prep → load_interview_prep via SQLite."""
+    monkeypatch.setattr(
+        "pega_agent.config.settings.pega_db_path", tmp_path / "pega.sqlite"
+    )
+    import importlib
+
+    import pega_agent.db as db
+
+    importlib.reload(db)
+    from pega_agent.models import InterviewPrepPack, STARStory
+
+    pack = InterviewPrepPack(
+        job_id="j-prep",
+        language="es",
+        company_angle="NotCo necesita un Director de Producto con experiencia 0-to-1.",
+        star_stories=[
+            STARStory(
+                theme="0-to-1",
+                title="Lanzamiento",
+                situation="s",
+                task="t",
+                action="a",
+                result="r",
+                source_company="Acme",
+                source_bullet="Launched new B2C product line, +$1M revenue first year.",
+                language="es",
+            )
+        ],
+        questions_to_ask=["¿Cómo se mide el éxito de este rol a los 6 meses?"],
+        likely_questions=["Cuéntame de tu falla más reciente."],
+    )
+    db.save_interview_prep(pack)
+    got = db.load_interview_prep("j-prep")
+    assert got is not None
+    assert got.language == "es"
+    assert len(got.star_stories) == 1
+    assert got.star_stories[0].theme == "0-to-1"

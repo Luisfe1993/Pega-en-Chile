@@ -71,6 +71,18 @@ python -m pega_agent.cli profile-from-pdf "path/to/Resume.pdf"
 streamlit run app/streamlit_app.py
 ```
 
+After approving a job in the Quality Gate, you can run the post-approval agents:
+
+```powershell
+# Interview prep pack for an approved job (STAR + case + questions)
+pega interview-prep <job_id>
+
+# Negotiation counter-offer (CLP gross monthly)
+pega negotiate <job_id> --offer 9500000 --variable 15 --competing 10000000
+```
+
+Both also live as tabs in the Streamlit app (🎯 Interview Prep, 💰 Negotiation).
+
 ## Roadmap
 
 - [x] Phase 0 — scaffolding, profile schema, SQLite, Streamlit shell
@@ -78,7 +90,7 @@ streamlit run app/streamlit_app.py
 - [x] Phase 2 — Matcher agent (keyword + multilingual semantic embeddings)
 - [x] Phase 3 — Company Research agent (DDG + NewsAPI + LLM synthesis)
 - [x] Phase 4 — Tailor + Outreach + real LangGraph `interrupt()` Quality Gate
-- [ ] Phase 5 — Interview Prep + Negotiation
+- [x] Phase 5 — Interview Prep (STAR + case + questions) + Negotiation (CLP benchmark + counter draft)
 - [ ] Phase 6 — Promptfoo eval harness + weekly digest
 
 ## Ethics & ToS

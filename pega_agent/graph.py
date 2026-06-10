@@ -21,8 +21,9 @@ from rich.console import Console
 
 from pega_agent.config import settings
 from pega_agent.db import save_approval
+from pega_agent.digest import write_digest
 from pega_agent.discovery.agent import discover
-from pega_agent.matcher.agent import rank
+from pega_agent.matcher.agent_v2 import rank_v2
 from pega_agent.models import (
     ApprovalDecision,
     CompanyBrief,
@@ -31,6 +32,7 @@ from pega_agent.models import (
     MatchScore,
     OutreachDraft,
     Profile,
+    Search,
     TailoredCV,
 )
 from pega_agent.network.loader import load_network
@@ -43,10 +45,13 @@ console = Console()
 
 class PegaState(TypedDict, total=False):
     profile: Profile
+    search: Search
     queries: list[str]
     location: str
     jobs: list[JobPosting]
     scores: list[MatchScore]
+    dropped: dict[str, str]
+    digest_path: str
     briefs: list[CompanyBrief]
     research_top_n: int
     tailor_top_n: int
@@ -60,16 +65,23 @@ class PegaState(TypedDict, total=False):
 
 
 def node_discover(state: PegaState) -> PegaState:
+    search = state.get("search")
+    queries = state.get("queries") or (search.queries if search else None) or ["product manager"]
     jobs = discover(
-        queries=state.get("queries") or state["profile"].target_roles or ["product manager"],
+        queries=queries,
         location=state.get("location", "Santiago, Chile"),
     )
     return {"jobs": jobs}
 
 
 def node_match(state: PegaState) -> PegaState:
-    scores = rank(state["profile"], state["jobs"])
-    return {"scores": scores}
+    search = state.get("search") or Search()
+    scores, dropped = rank_v2(state["profile"], search, state["jobs"])
+    console.log(
+        f"[match] {len(scores)} kept · {len(dropped)} dropped "
+        f"(of {len(state['jobs'])} discovered)"
+    )
+    return {"scores": scores, "dropped": dropped}
 
 
 def node_research(state: PegaState) -> PegaState:
@@ -167,6 +179,24 @@ def node_quality_gate(state: PegaState) -> PegaState:
     return {"approved_ids": sorted(approved_ids)}
 
 
+def node_digest(state: PegaState) -> PegaState:
+    """Write the Markdown digest at the end of the run."""
+    search = state.get("search") or Search()
+    out_dir = settings.pega_db_path.parent / "digests"
+    path = write_digest(
+        profile=state["profile"],
+        search=search,
+        scores=state.get("scores", []),
+        dropped=state.get("dropped", {}),
+        total_discovered=len(state.get("jobs", [])),
+        out_dir=out_dir,
+        thread="run",
+        top_n=15,
+    )
+    console.log(f"[digest] wrote {path}")
+    return {"digest_path": str(path)}
+
+
 # ---------- graph builder ------------------------------------------------
 
 
@@ -193,13 +223,15 @@ def build_graph(checkpointer=None):
     g = StateGraph(PegaState)
     g.add_node("discover", node_discover)
     g.add_node("match", node_match)
+    g.add_node("digest", node_digest)
     g.add_node("research", node_research)
     g.add_node("tailor", node_tailor)
     g.add_node("outreach", node_outreach)
     g.add_node("quality_gate", node_quality_gate)
     g.set_entry_point("discover")
     g.add_edge("discover", "match")
-    g.add_edge("match", "research")
+    g.add_edge("match", "digest")
+    g.add_edge("digest", "research")
     g.add_edge("research", "tailor")
     g.add_edge("tailor", "outreach")
     g.add_edge("outreach", "quality_gate")

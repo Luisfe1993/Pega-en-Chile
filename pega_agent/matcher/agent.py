@@ -137,8 +137,9 @@ def _semantic_fit(profile: Profile, job: JobPosting) -> float:
     vecs = embeddings.embed_texts([profile_text, job_text])
     if vecs.shape[0] < 2:
         return 0.0
-    # cosine of unit-normalized vectors is in [-1, 1]; clamp to [0, 1]
-    return max(0.0, min(1.0, float(embeddings.cosine(vecs[0], vecs[1]))))
+    # e5 cosines sit in ~[0.75, 1.0] even for unrelated text; rescale that band to [0, 1]
+    cos = float(embeddings.cosine(vecs[0], vecs[1]))
+    return max(0.0, min(1.0, (cos - 0.75) / 0.25))
 
 
 def rank(profile: Profile, jobs: list[JobPosting]) -> list[MatchScore]:

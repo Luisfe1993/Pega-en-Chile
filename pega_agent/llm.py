@@ -2,6 +2,7 @@
 
   1. ANTHROPIC_API_KEY   → Claude Sonnet (best at structured output + ES tone)
   2. OPENAI_API_KEY      → GPT-4o-mini (cheap default for extraction)
+  3. GITHUB_TOKEN        → GitHub Models (free tier, OpenAI-compatible)
 
 The router returns a LangChain `BaseChatModel` ready for `.with_structured_output()`.
 """
@@ -25,14 +26,12 @@ def get_chat_model(
     temperature: float = 0.1,
     prefer: str | None = None,
 ) -> BaseChatModel:
-    """Return a chat model. `prefer` may be 'anthropic' | 'openai'."""
-    order: list[str]
-    if prefer == "anthropic":
-        order = ["anthropic", "openai"]
-    elif prefer == "openai":
-        order = ["openai", "anthropic"]
+    """Return a chat model. `prefer` may be 'anthropic' | 'openai' | 'github'."""
+    default_order = ["anthropic", "openai", "github"]
+    if prefer in default_order:
+        order = [prefer, *[p for p in default_order if p != prefer]]
     else:
-        order = ["anthropic", "openai"]
+        order = default_order
 
     for p in order:
         if p == "anthropic" and settings.anthropic_api_key:
@@ -51,11 +50,25 @@ def get_chat_model(
                 temperature=temperature,
                 api_key=settings.openai_api_key,
             )
+        if p == "github" and settings.github_token:
+            from langchain_openai import ChatOpenAI
+
+            return ChatOpenAI(
+                model=settings.github_models_model,
+                temperature=temperature,
+                api_key=settings.github_token,
+                base_url=settings.github_models_base_url,
+            )
 
     raise NoLLMConfiguredError(
-        "No LLM provider configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY in .env."
+        "No LLM provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, "
+        "or GITHUB_TOKEN in .env."
     )
 
 
 def has_llm() -> bool:
-    return bool(settings.anthropic_api_key or settings.openai_api_key)
+    return bool(
+        settings.anthropic_api_key
+        or settings.openai_api_key
+        or settings.github_token
+    )
